@@ -786,6 +786,86 @@
   </div>
 
   <script src="./api.js"></script>
+
+  <script>
+    // GitHub Pages fallback API helper.
+    // 若 ./api.js 已經正確載入 FamilyBibleApi，這段不會覆蓋它。
+    if (!window.FamilyBibleApi) {
+      window.FamilyBibleApi = (function () {
+        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyZjv5XvmzZ2GHBXBUzuwBbw9MR1LPkgbGfGLfjEgCVrT9WBoH3u1f60-8k-x_GBffQSg/exec';
+
+        function call(action, payload) {
+          return new Promise(function (resolve, reject) {
+            if (!GAS_WEB_APP_URL) {
+              reject(new Error('尚未設定 GAS_WEB_APP_URL'));
+              return;
+            }
+
+            const callbackName =
+              'familyBibleCallback_' +
+              Date.now() +
+              '_' +
+              Math.random().toString(36).slice(2);
+
+            const script = document.createElement('script');
+
+            const timer = setTimeout(function () {
+              cleanup();
+              reject(new Error('讀取逾時，請確認 Google Apps Script 網頁應用程式網址是否正確'));
+            }, 30000);
+
+            function cleanup() {
+              clearTimeout(timer);
+
+              if (script && script.parentNode) {
+                script.parentNode.removeChild(script);
+              }
+
+              try {
+                delete window[callbackName];
+              } catch (e) {
+                window[callbackName] = undefined;
+              }
+            }
+
+            window[callbackName] = function (data) {
+              cleanup();
+
+              if (data && data.error) {
+                reject(new Error(data.message || '執行失敗'));
+                return;
+              }
+
+              resolve(data || {});
+            };
+
+            script.onerror = function () {
+              cleanup();
+              reject(new Error('無法連線到 Google Apps Script，請確認部署權限與網址'));
+            };
+
+            const params = [
+              'action=' + encodeURIComponent(action),
+              'callback=' + encodeURIComponent(callbackName),
+              '_=' + Date.now()
+            ];
+
+            if (payload !== undefined && payload !== null) {
+              params.push('payload=' + encodeURIComponent(JSON.stringify(payload)));
+            }
+
+            const separator = GAS_WEB_APP_URL.indexOf('?') >= 0 ? '&' : '?';
+            script.src = GAS_WEB_APP_URL + separator + params.join('&');
+            document.body.appendChild(script);
+          });
+        }
+
+        return {
+          call: call
+        };
+      })();
+    }
+  </script>
   <script>
     let districtsByArea = {};
     let activeBatches = [];
